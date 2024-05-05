@@ -6,14 +6,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
-		if (args.length != 2) {
-			System.out.println("Usage: enigmatov2 <input_folder> <output_folder>");
+		if (args.length != 3) {
+			System.out.println("Usage: enigmatov2 <input_folder> <output_folder> <exlude_names.txt>");
 			return;
 		}
 		
@@ -32,6 +35,15 @@ public class Main {
 		
 		Map<String, ClassMapping> mappings = new HashMap<>();
 		readMappings(dirIn, mappings);
+		
+		Set<String> exclude = getLines(new File(args[2])).stream().collect(Collectors.toUnmodifiableSet());
+		if (!exclude.isEmpty()) {
+			mappings.values().forEach(c -> {
+				exclude.forEach(c.fieldMappings::remove);
+				exclude.forEach(c.methodsMappings::remove);
+			});
+		}
+		
 		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\n");
 		mappings.values().stream().filter(ClassMapping::isValid).forEach(c -> builder.append(c.asString(0)));
 		FileWriter writer = new FileWriter(new File(dirOut, "mappings.tiny"));
@@ -52,7 +64,7 @@ public class Main {
 		}
 	}
 	
-	private static ClassMapping readMappingFile(File file) {
+	private static List<String> getLines(File file) {
 		List<String> lines;
 		try {
 			lines = Files.readAllLines(file.toPath());
@@ -60,7 +72,11 @@ public class Main {
 		catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		return getMapping(lines, new AtomicInteger(), null);
+		return lines;
+	}
+	
+	private static ClassMapping readMappingFile(File file) {
+		return getMapping(getLines(file), new AtomicInteger(), null);
 	}
 	
 	private static ClassMapping getMapping(List<String> lines, AtomicInteger index, ClassMapping parent) {
