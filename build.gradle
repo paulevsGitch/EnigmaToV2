@@ -8,3 +8,12 @@ version = "1.0-SNAPSHOT"
 repositories {
     mavenCentral()
 }
+
+jar {
+    //noinspection GroovyAssignabilityCheck
+    manifest {
+        attributes "Implementation-Title": "EnigmaToV2",
+                "Implementation-Version": this.version,
+                "Main-Class": "paulevs.enigmatov2.Main"
+    }
+}

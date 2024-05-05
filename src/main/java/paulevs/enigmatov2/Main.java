@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -13,13 +12,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
+		if (args.length != 2) {
+			System.out.println("Usage: enigmatov2 <input_folder> <output_folder>");
+			return;
+		}
+		
 		File dirIn = new File(args[0]);
 		File dirOut = new File(args[1]);
+		
+		if (!dirIn.exists()) {
+			System.out.println("Input directory doesn't exist");
+			return;
+		}
+		
+		if (!dirOut.exists()) {
+			//noinspection ResultOfMethodCallIgnored
+			dirOut.mkdirs();
+		}
+		
 		Map<String, ClassMapping> mappings = new HashMap<>();
 		readMappings(dirIn, mappings);
 		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\n");
 		mappings.values().forEach(builder::append);
-		FileWriter writer = new FileWriter(dirOut);
+		FileWriter writer = new FileWriter(new File(dirOut, "mappings.tiny"));
 		writer.write(builder.toString());
 		writer.flush();
 		writer.close();
