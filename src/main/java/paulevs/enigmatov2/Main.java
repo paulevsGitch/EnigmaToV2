@@ -33,7 +33,7 @@ public class Main {
 		Map<String, ClassMapping> mappings = new HashMap<>();
 		readMappings(dirIn, mappings);
 		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\n");
-		mappings.values().forEach(builder::append);
+		mappings.values().forEach(c -> builder.append(c.asString(0)));
 		FileWriter writer = new FileWriter(new File(dirOut, "mappings.tiny"));
 		writer.write(builder.toString());
 		writer.flush();
@@ -60,13 +60,20 @@ public class Main {
 		catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		return getMapping(lines, new AtomicInteger());
+		return getMapping(lines, new AtomicInteger(), null);
 	}
 	
-	private static ClassMapping getMapping(List<String> lines, AtomicInteger index) {
+	private static ClassMapping getMapping(List<String> lines, AtomicInteger index, ClassMapping parent) {
 		String line = lines.get(index.getAndIncrement());
 		int startingTabs = getTabs(line);
 		String[] parts = line.trim().split(" ");
+		
+		if (parent != null) {
+			parts[1] = parent.className + "$" + parts[1];
+			if (parts.length > 2) {
+				parts[2] = parent.classMapping + "$" + parts[2];
+			}
+		}
 		
 		String className = parts.length > 2 ? parts[2] : parts[1];
 		ClassMapping mapping = new ClassMapping(parts[1], className);
@@ -83,7 +90,7 @@ public class Main {
 			
 			switch (parts[0]) {
 				case "CLASS" -> {
-					ClassMapping nestedClass = getMapping(lines, index);
+					ClassMapping nestedClass = getMapping(lines, index, mapping);
 					ClassMapping contained = mapping.nested.get(parts[1]);
 					if (contained != null) {
 						nestedClass = mergeClasses(contained, nestedClass);
@@ -165,8 +172,7 @@ public class Main {
 			return classMapping.replace("/.", "/") + ".mapping";
 		}
 		
-		@Override
-		public String toString() {
+		public String asString(int tabs) {
 			if (className.equals(classMapping) && fieldMappings.isEmpty() && methodsMappings.isEmpty()) {
 				return "";
 			}
@@ -189,11 +195,9 @@ public class Main {
 				.values()
 				.stream()
 				.sorted(Comparator.comparing(m -> m.methodName))
-				.forEach(m -> builder.append(m.toString()));
+				.forEach(m -> builder.append(asString(tabs)));
 			
-			nested.values().stream().sorted(Comparator.comparing(c -> c.className)).forEach(child ->
-				builder.append(child.toString())
-			);
+			nested.values().forEach(c -> builder.append(asString(tabs + 1)));
 			
 			return builder.toString();
 		}
@@ -209,11 +213,11 @@ public class Main {
 			this.methodString = methodString;
 		}
 		
-		@Override
-		public String toString() {
+		public String asString(int tabs) {
 			final StringBuilder builder = new StringBuilder(methodString);
 			builder.append('\n');
 			args.keySet().stream().sorted().forEach(key -> {
+				builder.append("\t".repeat(Math.max(0, tabs)));
 				builder.append(args.get(key));
 				builder.append('\n');
 			});
