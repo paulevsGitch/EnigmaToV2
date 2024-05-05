@@ -33,7 +33,7 @@ public class Main {
 		Map<String, ClassMapping> mappings = new HashMap<>();
 		readMappings(dirIn, mappings);
 		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\n");
-		mappings.values().forEach(c -> builder.append(c.asString(0)));
+		mappings.values().stream().filter(ClassMapping::isValid).forEach(c -> builder.append(c.asString(0)));
 		FileWriter writer = new FileWriter(new File(dirOut, "mappings.tiny"));
 		writer.write(builder.toString());
 		writer.flush();
@@ -68,14 +68,13 @@ public class Main {
 		int startingTabs = getTabs(line);
 		String[] parts = line.trim().split(" ");
 		
+		String className = parts.length > 2 ? parts[2] : parts[1];
+		
 		if (parent != null) {
+			className = parent.classMapping + "$" + (parts.length > 2 ? parts[2] : parts[1]);
 			parts[1] = parent.className + "$" + parts[1];
-			if (parts.length > 2) {
-				parts[2] = parent.classMapping + "$" + parts[2];
-			}
 		}
 		
-		String className = parts.length > 2 ? parts[2] : parts[1];
 		ClassMapping mapping = new ClassMapping(parts[1], className);
 		MethodMapping activeMethod = null;
 		
@@ -168,22 +167,16 @@ public class Main {
 			this.classMapping = classMapping;
 		}
 		
-		String getFileName() {
-			return classMapping.replace("/.", "/") + ".mapping";
+		public boolean isValid() {
+			return !(classMapping.equals(className) && fieldMappings.isEmpty() && methodsMappings.isEmpty() && nested.isEmpty());
 		}
 		
 		public String asString(int tabs) {
-			if (className.equals(classMapping) && fieldMappings.isEmpty() && methodsMappings.isEmpty()) {
-				return "";
-			}
-			
 			StringBuilder builder = new StringBuilder();
 			builder.append("c\t");
 			builder.append(className);
-			if (!classMapping.substring(classMapping.lastIndexOf('/') + 1).startsWith("class_")) {
-				builder.append('\t');
-				builder.append(classMapping);
-			}
+			builder.append('\t');
+			builder.append(classMapping);
 			builder.append('\n');
 			
 			fieldMappings.values().stream().sorted().forEach(field -> {
@@ -197,7 +190,7 @@ public class Main {
 				.sorted(Comparator.comparing(m -> m.methodName))
 				.forEach(m -> builder.append(m.asString(tabs)));
 			
-			nested.values().forEach(c -> builder.append(c.asString(tabs + 1)));
+			nested.values().stream().filter(ClassMapping::isValid).forEach(c -> builder.append(c.asString(tabs + 1)));
 			
 			return builder.toString();
 		}
