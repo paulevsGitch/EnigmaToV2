@@ -90,9 +90,13 @@ public class Main {
 					}
 					mapping.nested.put(parts[1], nestedClass);
 				}
-				case "FIELD" -> mapping.fieldMappings.put(parts[1], "\tf\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2]);
+				case "FIELD" -> {
+					if (!parts[1].equals(parts[2])) {
+						mapping.fieldMappings.put(parts[1], "\tf\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2]);
+					}
+				}
 				case "METHOD" -> {
-					if (parts.length > 3) {
+					if (parts.length > 3 && !parts[1].equals(parts[2])) {
 						activeMethod = new MethodMapping(parts[1],
 							"\tm\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2]
 						);
@@ -101,7 +105,7 @@ public class Main {
 					}
 				}
 				case "ARG" -> {
-					if (activeMethod != null) {
+					if (activeMethod != null && !parts[1].equals(parts[2])) {
 						activeMethod.args.put(Integer.parseInt(parts[1]), "\t\tp\t" + parts[1] + "\t" + parts[2]);
 					}
 				}
@@ -144,10 +148,6 @@ public class Main {
 		return count;
 	}
 	
-	private static void addTabs(StringBuilder builder, int count) {
-		builder.append("\t".repeat(Math.max(0, count)));
-	}
-	
 	private static class ClassMapping {
 		final String className;
 		final String classMapping;
@@ -167,6 +167,10 @@ public class Main {
 		
 		@Override
 		public String toString() {
+			if (className.equals(classMapping) && fieldMappings.isEmpty() && methodsMappings.isEmpty()) {
+				return "";
+			}
+			
 			StringBuilder builder = new StringBuilder();
 			builder.append("c\t");
 			builder.append(className);
