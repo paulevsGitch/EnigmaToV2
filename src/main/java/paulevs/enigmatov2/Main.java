@@ -195,9 +195,9 @@ public class Main {
 				.values()
 				.stream()
 				.sorted(Comparator.comparing(m -> m.methodName))
-				.forEach(m -> builder.append(asString(tabs)));
+				.forEach(m -> builder.append(m.asString(tabs)));
 			
-			nested.values().forEach(c -> builder.append(asString(tabs + 1)));
+			nested.values().forEach(c -> builder.append(c.asString(tabs + 1)));
 			
 			return builder.toString();
 		}
