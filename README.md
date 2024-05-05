@@ -1,4 +1,7 @@
 # EnigmaToV2
+
+[![Jitpack](https://jitpack.io/v/paulevsGitch/EnigmaToV2.svg)](https://jitpack.io/#paulevsGitch/EnigmaToV2)
+
 Tool to convert Enigma mappings to V2 mappings
 
 Sources:
