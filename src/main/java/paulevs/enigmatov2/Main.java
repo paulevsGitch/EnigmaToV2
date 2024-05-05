@@ -106,7 +106,7 @@ public class Main {
 				}
 				case "ARG" -> {
 					if (activeMethod != null && !parts[1].equals(parts[2])) {
-						activeMethod.args.put(Integer.parseInt(parts[1]), "\t\tp\t" + parts[1] + "\t" + parts[2]);
+						activeMethod.args.put(Integer.parseInt(parts[1]), "\t\tp\t" + parts[1] + "\t\t" + parts[2]);
 					}
 				}
 			}
