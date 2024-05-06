@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
 	private static final String EMPTY = "";
+	private static final String TABS = "\t\t\t";
 	private static final String[] EMPTY_ARR = new String[] {EMPTY, EMPTY};
 	private static final Map<String, String> EMPTY_MAP = new HashMap<>();
 	
@@ -148,7 +149,7 @@ public class Main {
 					classMapping.nested.put(parts[1], nestedClass);
 				}
 				case "FIELD" -> {
-					String name = intermediaryFields.getOrDefault(classMapping.className, EMPTY_MAP).getOrDefault(parts[1], EMPTY);
+					String name = intermediaryFields.getOrDefault(classMapping.className, EMPTY_MAP).getOrDefault(parts[1], TABS);
 					if (!parts[1].equals(parts[2])) {
 						classMapping.fieldMappings.put(
 							parts[1],
@@ -157,7 +158,7 @@ public class Main {
 					}
 				}
 				case "METHOD" -> {
-					String name = intermediaryFields.getOrDefault(classMapping.className, EMPTY_MAP).getOrDefault(parts[1], EMPTY);
+					String name = intermediaryFields.getOrDefault(classMapping.className, EMPTY_MAP).getOrDefault(parts[1], TABS);
 					if (parts.length > 3 && !parts[1].equals(parts[2])) {
 						activeMethod = new MethodMapping(parts[1],
 							"\tm\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2] + name
@@ -167,7 +168,7 @@ public class Main {
 					}
 					else if (parts[1].equals("<init>")) {
 						activeMethod = new MethodMapping(parts[1],
-							"\tm\t" + parts[2] + "\t" + parts[1] + "\t" + parts[1] + name
+							"\tm\t" + parts[2] + "\t<init>\t<init>\t<init>\t<init>\t<init>"
 						);
 						classMapping.methodsMappings.put(parts[1] + " " + parts[2], activeMethod);
 					}
