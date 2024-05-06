@@ -9,17 +9,18 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Main {
 	private static final String EMPTY = "";
 	private static final String TABS = "\t\t\t";
-	private static final String[] EMPTY_ARR = new String[] {EMPTY, EMPTY};
 	private static final Map<String, String> EMPTY_MAP = new HashMap<>();
 	
 	public static void main(String[] args) throws IOException {
-		if (args.length != 3) {
-			System.out.println("Usage: enigmatov2 <input_folder> <output_folder> <intermediary-v2.tiny>");
+		if (args.length < 3 || args.length > 4) {
+			System.out.println("Usage: enigmatov2 <input_folder> <output_folder> <intermediary-v2.tiny> [optional_exclude.txt]");
 			return;
 		}
 		
@@ -67,8 +68,11 @@ public class Main {
 				String glueName = parts.length > fGlue ? parts[fGlue] : EMPTY;
 				String clientName = parts.length > fClient ? parts[fClient] : EMPTY;
 				String serverName = parts.length > fServer ? parts[fServer] : EMPTY;
-				if (clientName.equals(fieldName)) clientName = "";
-				if (serverName.equals(fieldName)) serverName = "";
+				if ((clientName.equals(glueName) || serverName.equals(glueName)) && !className.contains("argo")) {
+					System.out.println(className + " " + fieldName + " " + glueName + " " + clientName + " " + serverName);
+				}
+				//if (clientName.equals(fieldName)) clientName = "";
+				//if (serverName.equals(fieldName)) serverName = "";
 				intermediaryFields.computeIfAbsent(className, k -> new HashMap<>()).put(
 					fieldName, "\t" + glueName + "\t" + serverName + "\t" + clientName
 				);
@@ -77,6 +81,16 @@ public class Main {
 		
 		Map<String, ClassMapping> mappings = new HashMap<>();
 		readMappings(dirIn, mappings, intermediaryClasses, intermediaryFields);
+		
+		if (args.length > 3) {
+			Set<String> exclude = getLines(new File(args[3])).stream().collect(Collectors.toUnmodifiableSet());
+			if (!exclude.isEmpty()) {
+				mappings.values().forEach(c -> {
+					exclude.forEach(c.fieldMappings::remove);
+					exclude.forEach(c.methodsMappings::remove);
+				});
+			}
+		}
 		
 		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\tglue\tserver\tclient\n");
 		mappings.values().stream().filter(ClassMapping::isValid).forEach(c -> builder.append(c.asString(0)));
