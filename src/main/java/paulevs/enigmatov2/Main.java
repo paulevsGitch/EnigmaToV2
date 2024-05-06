@@ -118,7 +118,7 @@ public class Main {
 		String mapName = parts.length > 2 ? parts[2] : parts[1];
 		
 		if (parent != null) {
-			mapName = parent.classMapping + "$" + (parts.length > 2 ? parts[2] : parts[1]);
+			mapName = parent.classMapping.substring(0, parent.classMapping.indexOf('\t')) + "$" + (parts.length > 2 ? parts[2] : parts[1]);
 			parts[1] = parent.className + "$" + parts[1];
 		}
 		
