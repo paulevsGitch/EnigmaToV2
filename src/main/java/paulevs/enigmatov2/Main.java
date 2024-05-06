@@ -67,6 +67,8 @@ public class Main {
 				String glueName = parts.length > fGlue ? parts[fGlue] : EMPTY;
 				String clientName = parts.length > fClient ? parts[fClient] : EMPTY;
 				String serverName = parts.length > fServer ? parts[fServer] : EMPTY;
+				if (clientName.equals(fieldName)) clientName = "";
+				if (serverName.equals(fieldName)) serverName = "";
 				intermediaryFields.computeIfAbsent(className, k -> new HashMap<>()).put(
 					fieldName, "\t" + glueName + "\t" + serverName + "\t" + clientName
 				);
