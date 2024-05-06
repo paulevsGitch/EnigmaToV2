@@ -147,7 +147,7 @@ public class Main {
 					if (!parts[1].equals(parts[2])) {
 						classMapping.fieldMappings.put(
 							parts[1],
-							"\tf\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2] + names[1] + "\t" + names[0]
+							"\tf\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2] + "\t" + names[1] + "\t" + names[0]
 						);
 					}
 				}
