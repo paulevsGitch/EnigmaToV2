@@ -4,19 +4,21 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 public class Main {
+	private static final String EMPTY = "";
+	private static final String[] EMPTY_ARR = new String[] {EMPTY, EMPTY};
+	private static final Map<String, String[]> EMPTY_MAP = new HashMap<>();
+	
 	public static void main(String[] args) throws IOException {
 		if (args.length != 3) {
-			System.out.println("Usage: enigmatov2 <input_folder> <output_folder> <exlude_names.txt>");
+			System.out.println("Usage: enigmatov2 <input_folder> <output_folder> <intermediary-v2.tiny>");
 			return;
 		}
 		
@@ -33,18 +35,43 @@ public class Main {
 			dirOut.mkdirs();
 		}
 		
-		Map<String, ClassMapping> mappings = new HashMap<>();
-		readMappings(dirIn, mappings);
+		Map<String, Map<String, String[]>> intermediaryFields = new HashMap<>();
+		Map<String, String[]> intermediaryClasses = new HashMap<>();
 		
-		Set<String> exclude = getLines(new File(args[2])).stream().collect(Collectors.toUnmodifiableSet());
-		if (!exclude.isEmpty()) {
-			mappings.values().forEach(c -> {
-				exclude.forEach(c.fieldMappings::remove);
-				exclude.forEach(c.methodsMappings::remove);
-			});
+		List<String> intermediaryText = getLines(new File(args[2]));
+		List<String> header = Arrays.stream(intermediaryText.get(0).split("\t")).toList();
+		intermediaryText.remove(0);
+		
+		int glue = header.indexOf("intermediary") - 2;
+		int client = header.indexOf("client") - 2;
+		int server = header.indexOf("server") - 2;
+		int fGlue = glue + 1;
+		int fClient = client + 1;
+		int fServer = server + 1;
+		
+		String className = null;
+		for (String line : intermediaryText) {
+			String[] parts = line.trim().split("\t");
+			if (line.startsWith("c")) {
+				className = parts[glue];
+				String clientName = parts.length > client ? parts[client] : EMPTY;
+				String serverName = parts.length > server ? parts[server] : EMPTY;
+				intermediaryClasses.put(className, new String[] {clientName, serverName});
+			}
+			else if (className != null) {
+				String fieldName = parts[fGlue];
+				String clientName = parts.length > fClient ? parts[fClient] : EMPTY;
+				String serverName = parts.length > fServer ? parts[fServer] : EMPTY;
+				intermediaryFields.computeIfAbsent(className, k -> new HashMap<>()).put(
+					fieldName, new String[] {clientName, serverName}
+				);
+			}
 		}
 		
-		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\n");
+		Map<String, ClassMapping> mappings = new HashMap<>();
+		readMappings(dirIn, mappings, intermediaryClasses, intermediaryFields);
+		
+		StringBuilder builder = new StringBuilder("tiny\t2\t0\tintermediary\tnamed\tserver\tclient\n");
 		mappings.values().stream().filter(ClassMapping::isValid).forEach(c -> builder.append(c.asString(0)));
 		FileWriter writer = new FileWriter(new File(dirOut, "mappings.tiny"));
 		writer.write(builder.toString());
@@ -52,14 +79,17 @@ public class Main {
 		writer.close();
 	}
 	
-	private static void readMappings(File dir, Map<String, ClassMapping> mappings) {
+	private static void readMappings(
+		File dir, Map<String, ClassMapping> mappings,
+		Map<String, String[]> intermediaryClasses, Map<String, Map<String, String[]>> intermediaryFields
+	) {
 		for (File file : dir.listFiles()) {
-			if (file.isDirectory()) readMappings(file, mappings);
+			if (file.isDirectory()) readMappings(file, mappings, intermediaryClasses, intermediaryFields);
 			else if (file.getName().endsWith(".mapping")) {
-				ClassMapping c = readMappingFile(file);
-				ClassMapping c2 = mappings.get(c.className);
-				if (c2 != null) c = mergeClasses(c, c2);
-				mappings.put(c.className, c);
+				ClassMapping c1 = getMapping(getLines(file), new AtomicInteger(), null, intermediaryClasses, intermediaryFields);
+				ClassMapping c2 = mappings.get(c1.className);
+				if (c2 != null) c1 = mergeClasses(c1, c2);
+				mappings.put(c1.className, c1);
 			}
 		}
 	}
@@ -75,60 +105,71 @@ public class Main {
 		return lines;
 	}
 	
-	private static ClassMapping readMappingFile(File file) {
-		return getMapping(getLines(file), new AtomicInteger(), null);
-	}
-	
-	private static ClassMapping getMapping(List<String> lines, AtomicInteger index, ClassMapping parent) {
+	private static ClassMapping getMapping(List<String> lines, AtomicInteger index, ClassMapping parent, Map<String, String[]> intermediaryClasses, Map<String, Map<String, String[]>> intermediaryFields) {
 		String line = lines.get(index.getAndIncrement());
 		int startingTabs = getTabs(line);
 		String[] parts = line.trim().split(" ");
 		
-		String className = parts.length > 2 ? parts[2] : parts[1];
+		String mapName = parts.length > 2 ? parts[2] : parts[1];
 		
 		if (parent != null) {
-			className = parent.classMapping + "$" + (parts.length > 2 ? parts[2] : parts[1]);
+			mapName = parent.classMapping + "$" + (parts.length > 2 ? parts[2] : parts[1]);
 			parts[1] = parent.className + "$" + parts[1];
 		}
 		
-		ClassMapping mapping = new ClassMapping(parts[1], className);
+		String[] names = intermediaryClasses.getOrDefault(parts[1], EMPTY_ARR);
+		ClassMapping classMapping = new ClassMapping(parts[1], mapName, names[0], names[1]);
 		MethodMapping activeMethod = null;
 		
 		while (index.get() < lines.size()) {
 			line = lines.get(index.get());
 			
 			int tabs = getTabs(line);
-			if (tabs <= startingTabs) return mapping;
+			if (tabs <= startingTabs) return classMapping;
 			
 			line = line.trim();
 			parts = line.split(" ");
 			
 			switch (parts[0]) {
 				case "CLASS" -> {
-					ClassMapping nestedClass = getMapping(lines, index, mapping);
-					ClassMapping contained = mapping.nested.get(parts[1]);
+					ClassMapping nestedClass = getMapping(lines, index, classMapping,
+						intermediaryClasses,
+						intermediaryFields
+					);
+					ClassMapping contained = classMapping.nested.get(parts[1]);
 					if (contained != null) {
 						nestedClass = mergeClasses(contained, nestedClass);
 					}
-					mapping.nested.put(parts[1], nestedClass);
+					classMapping.nested.put(parts[1], nestedClass);
 				}
 				case "FIELD" -> {
+					names = intermediaryFields.getOrDefault(classMapping.className, EMPTY_MAP).getOrDefault(parts[1], EMPTY_ARR);
 					if (!parts[1].equals(parts[2])) {
-						mapping.fieldMappings.put(parts[1], "\tf\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2]);
+						classMapping.fieldMappings.put(
+							parts[1],
+							"\tf\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2] + names[1] + "\t" + names[0]
+						);
 					}
 				}
 				case "METHOD" -> {
+					names = intermediaryFields.getOrDefault(classMapping.className, EMPTY_MAP).getOrDefault(parts[1], EMPTY_ARR);
 					if (parts.length > 3 && !parts[1].equals(parts[2])) {
 						activeMethod = new MethodMapping(parts[1],
-							"\tm\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2]
+							"\tm\t" + parts[3] + "\t" + parts[1] + "\t" + parts[2] + "\t" + names[1] + "\t" + names[0]
 						);
 						String name = parts[1].startsWith("method_") ? parts[1] : parts[1] + " " + line;
-						mapping.methodsMappings.put(name, activeMethod);
+						classMapping.methodsMappings.put(name, activeMethod);
+					}
+					else if (parts[1].equals("<init>")) {
+						activeMethod = new MethodMapping(parts[1],
+							"\tm\t" + parts[2] + "\t" + parts[1] + "\t" + parts[1] + "\t" + names[1] + "\t" + names[0]
+						);
+						classMapping.methodsMappings.put(parts[1] + " " + parts[2], activeMethod);
 					}
 				}
 				case "ARG" -> {
 					if (activeMethod != null && !parts[1].equals(parts[2])) {
-						activeMethod.args.put(Integer.parseInt(parts[1]), "\t\tp\t" + parts[1] + "\t\t" + parts[2]);
+						activeMethod.args.put(Integer.parseInt(parts[1]), "\t\tp\t" + parts[1] + "\t\t" + parts[2] + "\t\t");
 					}
 				}
 			}
@@ -136,12 +177,12 @@ public class Main {
 			index.incrementAndGet();
 		}
 		
-		return mapping;
+		return classMapping;
 	}
 	
 	private static ClassMapping mergeClasses(ClassMapping a, ClassMapping b) {
 		String className = a.classMapping.equals(a.className) ? b.classMapping : a.classMapping;
-		ClassMapping result = new ClassMapping(a.className, className);
+		ClassMapping result = new ClassMapping(a.className, className, a.clientName, a.serverName);
 		
 		mergeMaps(a.nested, b.nested, result.nested);
 		mergeMaps(a.fieldMappings, b.fieldMappings, result.fieldMappings);
@@ -173,14 +214,18 @@ public class Main {
 	private static class ClassMapping {
 		final String className;
 		final String classMapping;
+		final String clientName;
+		final String serverName;
 		
 		final Map<String, String> fieldMappings = new HashMap<>();
 		final Map<String, MethodMapping> methodsMappings = new HashMap<>();
 		final Map<String, ClassMapping> nested = new HashMap<>();
 		
-		ClassMapping(String className, String classMapping) {
+		ClassMapping(String className, String classMapping, String clientName, String serverName) {
 			this.className = className;
 			this.classMapping = classMapping;
+			this.clientName = clientName;
+			this.serverName = serverName;
 		}
 		
 		public boolean isValid() {
@@ -193,6 +238,10 @@ public class Main {
 			builder.append(className);
 			builder.append('\t');
 			builder.append(classMapping);
+			builder.append('\t');
+			builder.append(serverName);
+			builder.append('\t');
+			builder.append(clientName);
 			builder.append('\n');
 			
 			fieldMappings.values().stream().sorted().forEach(field -> {
@@ -215,6 +264,7 @@ public class Main {
 	private static class MethodMapping {
 		final String methodName;
 		final String methodString;
+		
 		final Map<Integer, String> args = new HashMap<>();
 		
 		MethodMapping(String methodName, String methodString) {
