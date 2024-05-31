@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -71,8 +72,6 @@ public class Main {
 				if ((clientName.equals(glueName) || serverName.equals(glueName)) && !className.contains("argo")) {
 					System.out.println(className + " " + fieldName + " " + glueName + " " + clientName + " " + serverName);
 				}
-				//if (clientName.equals(fieldName)) clientName = "";
-				//if (serverName.equals(fieldName)) serverName = "";
 				intermediaryFields.computeIfAbsent(className, k -> new HashMap<>()).put(
 					fieldName, "\t" + glueName + "\t" + serverName + "\t" + clientName
 				);
@@ -85,10 +84,15 @@ public class Main {
 		if (args.length > 3) {
 			Set<String> exclude = getLines(new File(args[3])).stream().collect(Collectors.toUnmodifiableSet());
 			if (!exclude.isEmpty()) {
-				mappings.values().forEach(c -> {
+				List<String> excludeClasses = new ArrayList<>();
+				mappings.forEach((key, c) -> {
 					exclude.forEach(c.fieldMappings::remove);
 					exclude.forEach(c.methodsMappings::remove);
+					if (exclude.contains(c.className)) {
+						excludeClasses.add(key);
+					}
 				});
+				excludeClasses.forEach(mappings::remove);
 			}
 		}
 		
@@ -203,8 +207,8 @@ public class Main {
 	}
 	
 	private static ClassMapping mergeClasses(ClassMapping a, ClassMapping b) {
-		String className = a.classMapping.equals(a.className) ? b.classMapping : a.classMapping;
-		ClassMapping result = new ClassMapping(a.className, className);
+		String mapName = a.classMapping.equals(a.className) ? b.classMapping : a.classMapping;
+		ClassMapping result = new ClassMapping(a.className, mapName);
 		
 		mergeMaps(a.nested, b.nested, result.nested);
 		mergeMaps(a.fieldMappings, b.fieldMappings, result.fieldMappings);
