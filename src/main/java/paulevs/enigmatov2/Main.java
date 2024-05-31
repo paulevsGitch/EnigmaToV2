@@ -69,9 +69,6 @@ public class Main {
 				String glueName = parts.length > fGlue ? parts[fGlue] : EMPTY;
 				String clientName = parts.length > fClient ? parts[fClient] : EMPTY;
 				String serverName = parts.length > fServer ? parts[fServer] : EMPTY;
-				if ((clientName.equals(glueName) || serverName.equals(glueName)) && !className.contains("argo")) {
-					System.out.println(className + " " + fieldName + " " + glueName + " " + clientName + " " + serverName);
-				}
 				intermediaryFields.computeIfAbsent(className, k -> new HashMap<>()).put(
 					fieldName, "\t" + glueName + "\t" + serverName + "\t" + clientName
 				);
@@ -85,12 +82,17 @@ public class Main {
 			Set<String> exclude = getLines(new File(args[3])).stream().collect(Collectors.toUnmodifiableSet());
 			if (!exclude.isEmpty()) {
 				List<String> excludeClasses = new ArrayList<>();
+				List<String> excludeInternals = new ArrayList<>();
 				mappings.forEach((key, c) -> {
-					exclude.forEach(c.fieldMappings::remove);
-					exclude.forEach(c.methodsMappings::remove);
-					if (exclude.contains(c.className)) {
-						excludeClasses.add(key);
-					}
+					exclude.forEach(name -> {
+						c.fieldMappings.remove(name);
+						c.methodsMappings.remove(name);
+						c.nested.forEach((k, map) -> {
+							if (map.className.equals(name)) excludeInternals.add(k);
+						});
+						excludeInternals.forEach(c.nested::remove);
+						if (name.equals(c.className)) excludeClasses.add(key);
+					});
 				});
 				excludeClasses.forEach(mappings::remove);
 			}
